@@ -1,11 +1,13 @@
 import { saveAs } from 'file-saver';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const exportCSV = (results, material) => {
   const csvContent = [
-    'Tipo de Barra,Quantidade Usada,Desperdício Total (mm),Custo do Desperdício (R$)',
-    ...results.summary.map(bar => `${bar.name},${bar.used},${bar.totalWaste.toFixed(2)},${(bar.totalWaste * material.density * material.pricePerKg).toFixed(2)}`)
+    'Barra,Quantidade Usada,Desperdício Total (mm),Custo do Desperdício (R$)',
+    ...results.map(bar => 
+      `${bar.name},${bar.used},${bar.totalWaste.toFixed(2)},${(bar.totalWaste * material.density * material.pricePerKg).toFixed(2)}`
+    )
   ].join('\n');
   
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
@@ -14,51 +16,123 @@ export const exportCSV = (results, material) => {
 
 export const exportPDF = (results, material) => {
   const doc = new jsPDF();
-  const date = new Date().toLocaleString();
-  
-  // Cabeçalho
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Relatório de Plano de Corte', 15, 15);
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Data: ${date}`, 15, 23);
-  
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 10;
+  let yPos = margin;
+  const barHeight = 12;
+  const maxBarWidth = pageWidth - 2 * margin;
+
+  // Função para verificar espaço e adicionar página
+  const checkSpace = (requiredHeight) => {
+    if (yPos + requiredHeight > doc.internal.pageSize.getHeight() - 15) {
+      doc.addPage();
+      yPos = margin;
+      // Restaurar cor padrão ao criar nova página
+      doc.setTextColor(0, 0, 0); // Preto
+      doc.setFontSize(12);
+      doc.text('Continuação do Relatório', margin, yPos);
+      yPos += 15;
+      return true;
+    }
+    return false;
+  };
+
+  // Cabeçalho principal (preto)
+  doc.setFontSize(16);
+  doc.setTextColor(0, 0, 0); // Garantir cor preta
+  doc.text('Relatório de Corte Otimizado', margin, yPos);
+  yPos += 15;
+
   // Tabela de resumo
-  doc.autoTable({
-    startY: 30,
-    head: [['Barra', 'Quantidade', 'Desperdício (mm)', 'Custo (R$)']],
-    body: results.summary.map(bar => [
+  autoTable(doc, {
+    startY: yPos,
+    head: [['Barra', 'Qtd', 'Desperdício (mm)', 'Custo (R$)']],
+    body: results.map(bar => [
       bar.name,
-      bar.used.toString(),
-      bar.totalWaste.toFixed(2),
+      bar.used,
+      bar.totalWaste.toFixed(1),
       (bar.totalWaste * material.density * material.pricePerKg).toFixed(2)
     ]),
-    theme: 'grid',
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [41, 128, 185], textColor: 255 }
+    styles: { 
+      fontSize: 10,
+      textColor: [0, 0, 0] // Texto preto
+    },
+    headStyles: { 
+      fillColor: [25, 118, 210],
+      textColor: [255, 255, 255] // Texto branco
+    },
+    margin: { horizontal: margin }
   });
   
-  // Detalhes das barras
-  let yPos = doc.lastAutoTable.finalY + 10;
-  results.details.forEach(bar => {
+  yPos = doc.lastAutoTable.finalY + 10;
+
+  // Processar cada barra
+  results.forEach((bar, index) => {
+    // Título da barra (preto)
+    checkSpace(25);
     doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0); // Garantir cor preta
     doc.setFont('helvetica', 'bold');
-    doc.text(`Barra: ${bar.name} (${bar.length}mm)`, 15, yPos);
-    yPos += 7;
-    
-    bar.stock.forEach((rod, index) => {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Barra ${index + 1}:`, 20, yPos);
-      rod.parts.forEach((part, pIndex) => {
-        doc.text(`- ${part.name}: ${part.length}mm`, 25, yPos + 5 + (pIndex * 5));
+    doc.text(`Barra: ${bar.name} (${bar.length}mm) - Usadas: ${bar.used}`, margin, yPos);
+    yPos += 12;
+
+    // Processar cada córrego
+    bar.stock.forEach((rod, rodIndex) => {
+      checkSpace(barHeight + 20);
+      
+      // Fundo da barra (cinza claro)
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(margin, yPos, maxBarWidth, barHeight, 2, 2, 'F');
+
+      let currentX = margin;
+      rod.parts.forEach((part, partIndex) => {
+        const partWidth = (part.length / bar.length) * maxBarWidth;
+        
+        // Parte cortada (azul)
+        doc.setFillColor(21, 101, 192);
+        doc.rect(currentX, yPos, partWidth, barHeight, 'F');
+
+        // Texto da peça (branco)
+        doc.setFontSize(9);
+        doc.setTextColor(255, 255, 255); // Branco
+        doc.text(
+          `${part.name} (${part.length})`,
+          currentX + 2,
+          yPos + barHeight/2 + 3,
+          { maxWidth: partWidth - 4 }
+        );
+
+        currentX += partWidth;
       });
-      yPos += 10 + (rod.parts.length * 5);
+
+      // Restaurar cor preta para outros elementos
+      doc.setTextColor(0, 0, 0);
+
+      // Sobra (fundo escuro, texto branco)
+      const wasteText = `Sobra: ${rod.remaining.toFixed(1)}mm`;
+      doc.setFontSize(9);
+      const textWidth = doc.getTextWidth(wasteText);
+      
+      doc.setFillColor(40, 40, 40);
+      doc.rect(
+        margin + maxBarWidth - textWidth - 6,
+        yPos + barHeight - 11,
+        textWidth + 4,
+        9,
+        'F'
+      );
+      
+      doc.setTextColor(255, 255, 255); // Branco
+      doc.text(wasteText, margin + maxBarWidth - textWidth - 4, yPos + barHeight - 5);
+
+      // Restaurar cor preta após elemento
+      doc.setTextColor(0, 0, 0);
+      
+      yPos += barHeight + 10;
     });
-    yPos += 10;
+
+    yPos += 12;
   });
 
-  doc.save('relatorio_corte.pdf');
+  doc.save(`relatorio_corte_${Date.now()}.pdf`);
 };

@@ -1,26 +1,54 @@
 import React, { useState } from 'react';
 import { Paper, Typography, TextField, Button } from '@mui/material';
-import useBarFormStyles from './styles';
+import { RootContainer, StyledInput, SubmitButton } from './styles';
 
 const BarForm = ({ onAdd, errors }) => {
   const [bar, setBar] = useState({ name: '', length: '' });
-  const classes = useBarFormStyles();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Lógica de validação e submissão
+    if (!bar.name || !bar.length) return;
+    onAdd(bar);
+    setBar({ name: '', length: '' });
   };
 
   return (
-    <Paper className={classes.root}>
+    <RootContainer elevation={3}>
       <Typography variant="h6" gutterBottom>
-        Adicionar Barras
+        Adicionar Nova Barra
       </Typography>
       
       <form onSubmit={handleSubmit}>
-        {/* Campos do formulário */}
+        <StyledInput
+          label="Nome da Barra"
+          fullWidth
+          value={bar.name}
+          onChange={(e) => setBar({ ...bar, name: e.target.value })}
+          error={!!errors.barName}
+          helperText={errors.barName}
+        />
+        
+        <StyledInput
+          label="Comprimento (mm)"
+          type="number"
+          fullWidth
+          value={bar.length}
+          onChange={(e) => setBar({ ...bar, length: e.target.value })}
+          error={!!errors.barLength}
+          helperText={errors.barLength}
+          sx={{ mt: 2 }}
+        />
+        
+        <SubmitButton 
+          type="submit" 
+          variant="contained" 
+          fullWidth
+          sx={{ mt: 2 }}
+        >
+          Adicionar Barra
+        </SubmitButton>
       </form>
-    </Paper>
+    </RootContainer>
   );
 };
 

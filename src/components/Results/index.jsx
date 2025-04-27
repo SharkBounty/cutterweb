@@ -1,51 +1,36 @@
 import React from 'react';
 import { 
-  Paper, 
-  Typography, 
-  Box, 
-  Grid, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow,
-  Button
+  Paper, Typography, Box, Grid, Table, TableBody, TableCell, 
+  TableContainer, TableHead, TableRow, Button 
 } from '@mui/material';
-import useResultsStyles from './styles';
+import { RootContainer, Visualization, ResultTable, ExportButton } from './styles';
 
 const Results = ({ results, material, onExportCSV, onExportPDF }) => {
-  const classes = useResultsStyles();
-
   const calculateCost = (waste) => {
     return (waste * material.density * material.pricePerKg).toFixed(2);
   };
 
   return (
-    <Paper className={classes.root}>
-      <Box className={classes.header}>
-        <Typography variant="h5" className={classes.title}>
+    <RootContainer elevation={3}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h5" component="h2">
           Resultados da Otimização
         </Typography>
         
-        <Box className={classes.exportButtons}>
-          <Button onClick={onExportCSV} className={classes.exportButton}>
+        <Box>
+          <ExportButton onClick={onExportCSV} variant="outlined" sx={{ mr: 2 }}>
             Exportar CSV
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={onExportPDF}
-            className={classes.exportButton}
-          >
+          </ExportButton>
+          <ExportButton onClick={onExportPDF} variant="contained">
             Exportar PDF
-          </Button>
+          </ExportButton>
         </Box>
       </Box>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={5}>
+        <Grid item xs={12} md={4}>
           <TableContainer>
-            <Table className={classes.table}>
+            <ResultTable>
               <TableHead>
                 <TableRow>
                   <TableCell>Barra</TableCell>
@@ -56,7 +41,7 @@ const Results = ({ results, material, onExportCSV, onExportPDF }) => {
               </TableHead>
               
               <TableBody>
-                {results.summary.map((bar) => (
+                {results.map((bar) => (
                   <TableRow key={bar.name}>
                     <TableCell>{bar.name}</TableCell>
                     <TableCell align="right">{bar.used}</TableCell>
@@ -65,53 +50,73 @@ const Results = ({ results, material, onExportCSV, onExportPDF }) => {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ResultTable>
           </TableContainer>
         </Grid>
 
-        <Grid item xs={12} md={7}>
-          <Box className={classes.visualization}>
-            {results.details.map((barDetail) => (
-              <Box key={barDetail.name} className={classes.barContainer}>
-                <Typography variant="subtitle1" className={classes.barTitle}>
+        <Grid item xs={12} md={8}>
+          <Visualization sx={{ minWidth: 800 }}>
+            {results.map((barDetail) => (
+              <Box key={barDetail.name} sx={{ mb: 4 }}>
+                <Typography variant="subtitle1" sx={{ mb: 2 }}>
                   {barDetail.name} ({barDetail.length}mm) - {barDetail.used} unidades
                 </Typography>
                 
                 {barDetail.stock.map((rod, index) => (
-                  <Box key={index} className={classes.rod}>
-                    {rod.parts.map((part, partIndex) => {
-                      const partWidth = (part.length / barDetail.length) * 100;
-                      const partPosition = rod.parts
-                        .slice(0, partIndex)
-                        .reduce((acc, p) => acc + (p.length / barDetail.length) * 100, 0);
-
-                      return (
-                        <Box
-                          key={partIndex}
-                          className={classes.part}
-                          style={{
-                            left: `${partPosition}%`,
-                            width: `${partWidth}%`
-                          }}
-                        >
-                          <span className={classes.partLabel}>
-                            {part.name} ({part.length}mm)
-                          </span>
-                        </Box>
-                      );
-                    })}
+                  <Box key={index} sx={{
+                    position: 'relative',
+                    height: '40px',
+                    backgroundColor: '#e0e0e0',
+                    mb: 2,
+                    borderRadius: '6px',
+                    overflow: 'hidden'
+                  }}>
+                    {rod.parts.map((part, partIndex) => (
+                      <Box
+                        key={partIndex}
+                        sx={{
+                          position: 'absolute',
+                          left: `${rod.parts
+                            .slice(0, partIndex)
+                            .reduce((acc, p) => acc + (p.length / barDetail.length) * 100, 0)}%`,
+                          width: `${(part.length / barDetail.length) * 100}%`,
+                          height: '100%',
+                          backgroundColor: '#1976d2',
+                          borderRight: '2px solid white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          zIndex: 1
+                        }}
+                      >
+                        {part.name} ({part.length}mm)
+                      </Box>
+                    ))}
                     
-                    <Box className={classes.wasteLabel}>
+                    <Box sx={{
+                      position: 'absolute',
+                      right: '4px',
+                      bottom: '4px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      color: 'white',
+                      px: 1,
+                      py: 0.3,
+                      fontSize: '0.65rem',
+                      borderRadius: '3px',
+                      zIndex: 2
+                    }}>
                       Sobra: {rod.remaining.toFixed(1)}mm
                     </Box>
                   </Box>
                 ))}
               </Box>
             ))}
-          </Box>
+          </Visualization>
         </Grid>
       </Grid>
-    </Paper>
+    </RootContainer>
   );
 };
 
