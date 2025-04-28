@@ -1,46 +1,69 @@
 export const calculateCuttingPlan = (bars) => {
   return bars.map(bar => {
-    const sortedParts = bar.parts.flatMap(part => 
-      Array(part.quantity).fill().map(() => ({
-        name: part.name,
-        length: part.length
-      }))
-    ).sort((a, b) => b.length - a.length);
+    // Validar comprimentos
+    if (bar.length <= 0) throw new Error(`Comprimento inválido para barra ${bar.name}`);
+    
+    const parts = bar.parts.flatMap(part => {
+      if (part.length > bar.length) {
+        throw new Error(`Peça ${part.name} (${part.length}mm) excede o comprimento da barra ${bar.name} (${bar.length}mm)`);
+      }
+      return Array(part.quantity).fill({ 
+        name: part.name, 
+        length: part.length 
+      });
+    });
 
+    const sortedParts = [...parts].sort((a, b) => b.length - a.length);
     const stock = [];
     let totalWaste = 0;
+    let totalWastePercent = 0;
+    let totalLength = 0;
 
     sortedParts.forEach(part => {
-      let bestFit = null;
-
+      let bestFitIndex = -1;
+      let smallestWaste = Infinity;
+      
+      // Encontrar a melhor posição
       stock.forEach((rod, index) => {
         if (rod.remaining >= part.length) {
           const waste = rod.remaining - part.length;
-          if (!bestFit || waste < bestFit.waste) {
-            bestFit = { index, waste };
+          if (waste < smallestWaste) {
+            smallestWaste = waste;
+            bestFitIndex = index;
           }
         }
       });
 
-      if (bestFit) {
-        stock[bestFit.index].parts.push(part);
-        stock[bestFit.index].remaining -= part.length;
-        totalWaste += bestFit.waste;
+      // console.log(stock.remaining)
+      if (bestFitIndex !== -1) {
+        // Atualizar barra existente
+        stock[bestFitIndex].remaining -= part.length;
+        stock[bestFitIndex].parts.push(part);
+        
       } else {
+        // Criar nova barra
+        const remaining = bar.length - part.length;
         stock.push({
           length: bar.length,
-          parts: [part],
-          remaining: bar.length - part.length
+          remaining,
+          parts: [part]
         });
-        totalWaste += bar.length - part.length;
+        // totalWaste += remaining;
       }
     });
 
+    stock.forEach(rod => {
+      totalWaste += rod.remaining
+    });
+
+    totalLength = stock.length * bar.length;
+    totalWastePercent = (totalWaste/totalLength*100).toFixed(2)
     return {
       ...bar,
       used: stock.length,
       totalWaste,
-      stock
+      totalWastePercent,
+      stock,
     };
   });
 };
